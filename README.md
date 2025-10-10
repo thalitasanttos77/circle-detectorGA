@@ -3,7 +3,7 @@
 ## 📜 Descrição do Projeto
 Este projeto utiliza Algoritmos Genéticos (AG) para treinar uma Rede Neural (RNA) com o objetivo de identificar a posição e o tamanho de artefatos circulares pretos em imagens com fundo branco.A rede deve ser capaz de prover soluções sucessivamente melhores para convergir e demarcar as "bolas" válidas presentes na imagem.
 
-Este trabalho foi desenvolvido como avaliação para a disciplina de **Inteligência Computacional Aplicada II (DS804)** do curso de TADS da UFPR, sob orientação do Prof. Dr. Roberto Tadeu Raittz.
+Este trabalho foi desenvolvido como avaliação para a disciplina de **Inteligência Artificial II (DS804)** do curso de TADS da UFPR, sob orientação do Prof. Dr. Roberto Tadeu Raittz.
 
 ## 🧠 Tecnologias Centrais
 A solução se baseia na combinação de duas técnicas de inteligência computacional:
