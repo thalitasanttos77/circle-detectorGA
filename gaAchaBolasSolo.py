@@ -164,6 +164,7 @@ def get_check_points(cx, cy, r):
 def run_single_agent_video(best_bits):
     print("--- Iniciando Agente Único (Explorador) ---")
     
+    # Decodifica a RNA TREINADA
     W1, W2 = rna_struct.decode_weights(best_bits)
     
     # Prepara vídeo
@@ -175,7 +176,7 @@ def run_single_agent_video(best_bits):
     work_img = TARGET_IMG.copy() # Mapa mental (vai ficando branco)
     display_img = cv2.cvtColor(TARGET_IMG, cv2.COLOR_GRAY2BGR) # Resultado visual
     
-    # Mapa inicial
+    # Mapa inicial (dinâmico)
     _, binary_work = cv2.threshold(work_img, 127, 255, cv2.THRESH_BINARY)
     current_dist_map = cv2.distanceTransform(binary_work, cv2.DIST_L2, 5)
     
@@ -184,6 +185,7 @@ def run_single_agent_video(best_bits):
     
     balls_found = 0
     patience = 0
+    found_balls_list = []
     
     # Loop de simulação (1500 frames = 50 segundos)
     for frame_idx in range(1500):
@@ -194,7 +196,8 @@ def run_single_agent_video(best_bits):
         sensors = get_sensors(px, py, current_dist_map)
         
         # 2. Movimento
-        adjust = rna.forward(curr, sensors, W1, W2)
+        # IMPORTANTE: Usamos a instância rna_struct global
+        adjust = rna_struct.forward(curr, sensors, W1, W2)
         
         # Velocidade variável
         speed = 0.08 if sensors[2] > 5.0 else 0.02
@@ -208,7 +211,7 @@ def run_single_agent_video(best_bits):
         ax, ay = int(curr[0]*(W-1)), int(curr[1]*(H-1))
         ar = int(curr[2]*W)
         
-        # Desenha pontos de teste dinâmicos (o que o agente está "sentindo")
+        # Desenha pontos de teste dinâmicos
         pts_in, pts_out = get_check_points(ax, ay, ar)
         for p in pts_in: cv2.circle(frame, p, 1, (255,0,0), -1)
         for p in pts_out: cv2.circle(frame, p, 1, (0,255,255), -1)
@@ -231,30 +234,42 @@ def run_single_agent_video(best_bits):
                 # Se o encaixe for bom
                 if final_score > 100:
                     bx, by, br = final_c
-                    balls_found += 1
-                    print(f"Bola {balls_found} em ({bx},{by})")
                     
-                    # A. Marca Definitiva (Verde + Raio-X Fixo)
-                    cv2.circle(display_img, (bx, by), br, (0, 255, 0), 2)
-                    pi, po = get_check_points(bx, by, br)
-                    cv2.circle(display_img, (bx, by), 2, (0, 0, 255), -1)
-                    for p in pi: cv2.circle(display_img, p, 1, (255,0,0), -1)
-                    for p in po: cv2.circle(display_img, p, 1, (0,255,255), -1)
+                    # Validação extra: Não pode estar dentro de uma bola já achada
+                    is_inside = False
+                    for (fx, fy, fr) in found_balls_list:
+                         dist = np.sqrt((bx-fx)**2 + (by-fy)**2)
+                         # Se a distância for pequena comparada ao raio da maior, é duplicada/aninhada
+                         if dist < max(br, fr) * 0.8:
+                             is_inside = True
+                             break
                     
-                    # B. Apaga do mapa mental (Pinta de branco)
-                    cv2.circle(work_img, (bx, by), int(br * 1.2), 255, -1)
-                    
-                    # C. Atualiza gravidade (Atrai para a próxima)
-                    _, bw = cv2.threshold(work_img, 127, 255, cv2.THRESH_BINARY)
-                    current_dist_map = cv2.distanceTransform(bw, cv2.DIST_L2, 5)
-                    
-                    patience = 0
-                    
-                    # Flash visual
-                    for _ in range(5):
-                        flash = display_img.copy()
-                        cv2.circle(flash, (bx, by), br, (0, 255, 255), 3)
-                        out.write(flash)
+                    if not is_inside:
+                        balls_found += 1
+                        found_balls_list.append((bx, by, br))
+                        print(f"Bola {balls_found} em ({bx},{by})")
+                        
+                        # A. Marca Definitiva (Verde + Raio-X Fixo)
+                        cv2.circle(display_img, (bx, by), br, (0, 255, 0), 2)
+                        pi, po = get_check_points(bx, by, br)
+                        cv2.circle(display_img, (bx, by), 2, (0, 0, 255), -1)
+                        for p in pi: cv2.circle(display_img, p, 1, (255,0,0), -1)
+                        for p in po: cv2.circle(display_img, p, 1, (0,255,255), -1)
+                        
+                        # B. Apaga do mapa mental (Pinta de branco)
+                        cv2.circle(work_img, (bx, by), int(br * 1.2), 255, -1)
+                        
+                        # C. Atualiza gravidade
+                        _, bw = cv2.threshold(work_img, 127, 255, cv2.THRESH_BINARY)
+                        current_dist_map = cv2.distanceTransform(bw, cv2.DIST_L2, 5)
+                        
+                        patience = 0
+                        
+                        # Flash visual
+                        for _ in range(5):
+                            flash = display_img.copy()
+                            cv2.circle(flash, (bx, by), br, (0, 255, 255), 3)
+                            out.write(flash)
         
         # 5. Respawn se ficar perdido
         if sensors[2] > 10.0: patience += 1
